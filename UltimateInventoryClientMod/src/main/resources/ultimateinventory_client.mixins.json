@@ -4,7 +4,9 @@
   "package": "me.percyqaz.ultimateinventory.client.mixins",
   "compatibilityLevel": "JAVA_21",
   "mixins": [],
-  "client": [],
+  "client": [
+    "MixinInventoryUtils"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
