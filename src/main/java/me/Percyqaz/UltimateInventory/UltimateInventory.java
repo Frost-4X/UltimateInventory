@@ -1,6 +1,5 @@
 package me.Percyqaz.UltimateInventory;
 
-import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;

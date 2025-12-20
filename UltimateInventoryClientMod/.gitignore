@@ -5,6 +5,10 @@ build/
 *.jar
 !gradle-wrapper.jar
 
+# Development dependencies (Litematica JAR for Mixin compilation)
+libs/
+!libs/.gitkeep
+
 # IDE
 .idea/
 *.iml

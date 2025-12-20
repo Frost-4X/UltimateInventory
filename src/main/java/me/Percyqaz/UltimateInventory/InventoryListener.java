@@ -613,16 +613,26 @@ public class InventoryListener implements Listener
         ItemStack heldItem = player.getInventory().getItemInMainHand();
         boolean isHoldingAir = (heldItem == null || heldItem.getType() == Material.AIR);
         
+        // If player is holding a placeable item and right-clicking, they're placing a block, not picking
+        // Only trigger pick block if holding air or if it's a left-click in creative mode
+        if (e.getAction() == Action.RIGHT_CLICK_BLOCK && !isHoldingAir && heldItem != null) {
+            // Player is right-clicking with an item - they're likely placing, not picking
+            // Only exception: if they're holding the same block type they clicked (which shouldn't happen when placing)
+            if (heldItem.getType() != e.getClickedBlock().getType()) {
+                return; // Different types = placing a block, not picking
+            }
+        }
+        
         // In creative mode, be more permissive - accept both left and right click
         // Middle-click pick block might manifest as either action
         if (player.getGameMode() == GameMode.CREATIVE) {
             // In creative mode, if holding the same block type, skip (not a pick block attempt)
-            if (!isHoldingAir && heldItem.getType() == e.getClickedBlock().getType()) {
+            if (!isHoldingAir && heldItem != null && heldItem.getType() == e.getClickedBlock().getType()) {
                 return;
             }
         } else {
-            // In survival mode, only trigger on right-click
-            if (e.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            // In survival mode, only trigger on right-click with empty hand (pick block attempt)
+            if (e.getAction() != Action.RIGHT_CLICK_BLOCK || !isHoldingAir) {
                 return;
             }
         }
