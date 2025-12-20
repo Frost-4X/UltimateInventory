@@ -1,0 +1,37 @@
+shulkerbox:
+  enable: true
+  override: false
+  command: ''
+enderChest:
+  enable: true
+  override: false
+  command: ''
+craftingTable:
+  enable: true
+  override: false
+  command: ''
+smithingTable:
+  enable: true
+  override: false
+  command: ''
+stoneCutter:
+  enable: true
+  override: false
+  command: ''
+grindstone:
+  enable: true
+  override: false
+  command: ''
+cartographyTable:
+  enable: true
+  override: false
+  command: ''
+loom:
+  enable: true
+  override: false
+  command: ''
+anvil:
+  enable: false
+  override: false
+  command: ''
+usePermissions: false

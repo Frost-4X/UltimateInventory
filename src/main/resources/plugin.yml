@@ -4,7 +4,14 @@ author: Percyqaz
 main: me.Percyqaz.UltimateInventory.UltimateInventory
 api-version: '1.20'
 softdepend: [ChestSort]
+commands:
+  uipickblock:
+    description: Internal command for client mod pick block detection
+    usage: /<command> <material>
 permissions:
+# TODO: Add premium permission for pick block
+  ultimateinventory.pickblock:
+    default: true  # Allow all players to use this internal command
   ultimateinventory.shulkerbox:
     default: false
   ultimateinventory.enderchest:
