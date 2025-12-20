@@ -1,13 +1,9 @@
 package me.Percyqaz.UltimateInventory;
 
-import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scoreboard.Objective;
-import org.bukkit.scoreboard.Scoreboard;
-import org.bukkit.scoreboard.ScoreboardManager;
 
 public class UltimateInventory extends JavaPlugin {
 
@@ -68,41 +64,12 @@ public class UltimateInventory extends JavaPlugin {
                 this.getLogger().severe("Failed to register /uipickblock command! Check plugin.yml");
             }
 
-            initializeScoreboard();
-
-            if (config.getBoolean("pickBlock.enable", true)) {
-                ScoreboardMonitor scoreboardMonitor = new ScoreboardMonitor(this, inventoryListener);
-                scoreboardMonitor.runTaskTimer(this, 0L, 1L);
-            }
-
             this.getLogger().info("UltimateInventory has been enabled!");
             this.getLogger().info("Pick Block feature: " + (config.getBoolean("pickBlock.enable", true) ? "ENABLED" : "DISABLED"));
         } catch (Exception e) {
             this.getLogger().severe("CRITICAL ERROR in onEnable()!");
             this.getLogger().severe("Error: " + e.getMessage());
             e.printStackTrace();
-        }
-    }
-
-    private void initializeScoreboard() {
-        try {
-            ScoreboardManager manager = Bukkit.getScoreboardManager();
-            if (manager != null) {
-                Scoreboard mainScoreboard = manager.getMainScoreboard();
-                
-                // Create scoreboard objectives for pick block detection (kept for compatibility)
-                Objective triggerObj = mainScoreboard.getObjective("ui_pickblock_trigger");
-                if (triggerObj == null) {
-                    mainScoreboard.registerNewObjective("ui_pickblock_trigger", "dummy", "UI Pick Block Trigger");
-                }
-                
-                Objective materialNameObj = mainScoreboard.getObjective("ui_pickblock_material_name");
-                if (materialNameObj == null) {
-                    mainScoreboard.registerNewObjective("ui_pickblock_material_name", "dummy", "UI Pick Block Material Name");
-                }
-            }
-        } catch (Exception e) {
-            this.getLogger().warning("Could not initialize scoreboard: " + e.getMessage());
         }
     }
 

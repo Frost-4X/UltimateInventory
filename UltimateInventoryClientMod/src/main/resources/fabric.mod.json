@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "ultimateinventory_client",
   "version": "${version}",
-  "name": "UltimateInventory Client",
+  "name": "Ultimate Inventory Shulker Pick",
   "description": "Client-side mod for UltimateInventory plugin - enables pick block from shulker boxes",
   "authors": [
     "Percyqaz"

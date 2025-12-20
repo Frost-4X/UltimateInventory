@@ -7,6 +7,7 @@ import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
+import net.minecraft.text.Text;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.world.GameMode;
@@ -76,8 +77,15 @@ public class UltimateInventoryClient implements ClientModInitializer {
                     }
                 }
                 
-                // If vanilla didn't succeed, search shulker boxes
+                // If vanilla didn't succeed, check if we can swap before searching shulker boxes
                 if (!vanillaSucceeded) {
+                    // Check if all hotbar slots are blacklisted - if so, abort immediately
+                    if (areAllHotbarSlotsBlacklisted(player)) {
+                        // Don't send command - all slots are blacklisted
+                        // Notify the player
+                        player.sendMessage(Text.literal("§cCannot pick block: all hotbar slots contain items that cannot be swapped"), false);
+                        return;
+                    }
                     handlePickBlock(client, player, lastTargetItem);
                 }
                 
@@ -102,22 +110,56 @@ public class UltimateInventoryClient implements ClientModInitializer {
             materialName = namespace.toUpperCase() + "_" + materialName;
         }
         
-        // Get player UUID (without dashes, as expected by plugin)
-        String playerUUID = player.getUuid().toString().replace("-", "");
-        String playerName = player.getName().getString();
+        // Vanilla pick block failed - search shulker boxes
+        // Server plugin will send feedback messages (found/not found)
+        String command = "uipickblock " + materialName;
+        player.networkHandler.sendCommand(command);
+    }
+    
+    // Check if all hotbar slots (0-8) contain blacklisted items
+    // Returns true only if all 9 slots have items AND all items are blacklisted
+    private boolean areAllHotbarSlotsBlacklisted(ClientPlayerEntity player) {
+        for (int i = 0; i < 9; i++) {
+            ItemStack item = player.getInventory().getStack(i);
+            // Empty slots are fine - we can use them
+            if (item.isEmpty()) {
+                return false;
+            }
+            // If any slot has a non-blacklisted item, we can use it
+            if (!isBlacklistedForShulkerSwap(item.getItem())) {
+                return false;
+            }
+        }
+        // All 9 slots have items and all are blacklisted
+        return true;
+    }
+    
+    // Check if an item is blacklisted for shulker box swaps (matches server logic)
+    private boolean isBlacklistedForShulkerSwap(net.minecraft.item.Item item) {
+        var itemId = Registries.ITEM.getId(item);
+        String path = itemId.getPath();
+        String name = path.toLowerCase();
         
-        // Use scoreboard communication instead of custom command
-        // This is more efficient and less prone to abuse
-        // Format: "material:<UUID>:<MATERIAL>" (most reliable for multi-player)
-        String materialEntry = "material:" + playerUUID + ":" + materialName;
+        // Check for tools
+        if (name.contains("pickaxe") || name.contains("axe") || 
+            name.contains("shovel") || name.contains("hoe") || 
+            name.contains("sword") || name.contains("bow") ||
+            name.contains("crossbow") || name.contains("trident") ||
+            name.contains("fishing_rod") || name.contains("shears")) {
+            return true;
+        }
         
-        // Set the material name in scoreboard
-        String materialCommand = String.format("scoreboard players set \"%s\" ui_pickblock_material_name 1", materialEntry);
-        player.networkHandler.sendCommand(materialCommand);
+        // Check for shulker boxes
+        if (name.contains("shulker_box")) {
+            return true;
+        }
         
-        // Set the trigger to activate the plugin's scoreboard monitor
-        String triggerCommand = String.format("scoreboard players set %s ui_pickblock_trigger 1", playerName);
-        player.networkHandler.sendCommand(triggerCommand);
+        // Check for ender chest
+        if (name.equals("ender_chest")) {
+            return true;
+        }
+        
+        return false;
     }
 }
 
