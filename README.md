@@ -18,7 +18,9 @@ When you pick a block (middle-click by default) and vanilla Minecraft fails to f
 
 **Design:** Tools and shulker boxes cannot be moved/swapped by design to protect your inventory from accidental tool/shulker loss.
 
-**Requirements:** Install the [UltimateInventory Client Mod](UltimateInventoryClientMod/) on the client side for automatic pick block detection, or use the `/uipickblock <material>` command manually.
+**Requirements:**
+- **For vanilla pick block:** Works automatically on Paper 1.21.10+ servers - no client mod required! The plugin uses Paper's native `PlayerPickBlockEvent` to detect pick block requests.
+- **For Litematica integration:** If you use Litematica's pick block feature, install the [UltimateInventory Litematica Shulker Pick Mod](UILitematicaShulkerPick/) on the client side for automatic detection, or use the `/uipickblock <material>` command manually.
 
 ----
 
