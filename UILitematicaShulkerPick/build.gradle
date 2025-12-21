@@ -1,0 +1,156 @@
+plugins {
+    id 'fabric-loom' version '1.10.1'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    // Include Minecraft version in filename: ui-litematica-shulker-pick-1.0.0-1.21.5.jar
+    archivesName = "${project.archives_base_name}-${project.minecraft_version}"
+}
+
+loom {
+    // This is needed for mixins to work properly
+    mixin {
+        defaultRefmapName = "${project.mod_id}.refmap.json"
+    }
+}
+
+repositories {
+    // Add repositories for dependencies
+    maven {
+        name = "Fabric"
+        url = "https://maven.fabricmc.net/"
+    }
+    mavenCentral()
+    // Litematica maven (if available)
+    maven {
+        name = "masa"
+        url = "https://masa.dy.fi/maven"
+    }
+    // Local flatDir for Litematica (if built locally)
+    flatDir {
+        dirs "${project.rootDir}/../../Mods/litematica-1.21.5-0.22.1/build/libs"
+    }
+}
+
+dependencies {
+    // Minecraft and mappings
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    // Fabric API - required for ClientTickEvents and KeyBindingHelper
+    // Update version in gradle.properties if this doesn't work
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    
+    // Litematica - compile only for Mixin target resolution
+    // Searches in multiple locations (in order of priority):
+    // 1. Local libs folder (for development - recommended)
+    // 2. Parent/sibling mods folder (if mods are in a shared location)
+    // 3. Standard Minecraft mods folder
+    // 4. Litematica source build/libs (if building from source)
+    def litematicaJar = null
+    def userHome = System.getProperty("user.home")
+    def searchPaths = [
+        file("${project.rootDir}/libs"),  // Local development libs folder (highest priority)
+        file("${project.rootDir}/../mods"),  // Sibling mods folder
+        file("${userHome}/.minecraft/mods"),  // Standard Minecraft mods folder
+        file("${project.rootDir}/../../Mods/litematica-1.21.5-0.22.1/build/libs")  // Source build location
+    ]
+    
+    for (def searchDir : searchPaths) {
+        if (litematicaJar != null) break
+        
+        if (searchDir.exists() && searchDir.isDirectory()) {
+            def files = searchDir.listFiles()
+            if (files != null) {
+                for (def file : files) {
+                    if (file.name.startsWith("litematica-fabric-") && 
+                        file.name.endsWith(".jar") && 
+                        !file.name.contains("-sources") && 
+                        !file.name.contains("-dev")) {
+                        litematicaJar = file
+                        break
+                    }
+                }
+                if (litematicaJar != null) break
+            }
+        }
+    }
+    
+    if (litematicaJar != null && litematicaJar.exists()) {
+        modCompileOnly files(litematicaJar)
+        println "Using Litematica JAR: ${litematicaJar.path}"
+    } else {
+        println ""
+        println "=========================================="
+        println "WARNING: Litematica JAR not found!"
+        println "Searched in:"
+        searchPaths.each { println "  - ${it.path}" }
+        println "Looking for pattern: litematica-fabric-*.jar"
+        println ""
+        println "To fix this:"
+        println "  1. Copy litematica-fabric-*.jar to: ${project.rootDir}/libs/"
+        println "     (Recommended for development)"
+        println "  2. Or build Litematica from source:"
+        println "     cd ../../Mods/litematica-1.21.5-0.22.1"
+        println "     ./gradlew build"
+        println "=========================================="
+        println ""
+    }
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", project.minecraft_version
+    inputs.property "loader_version", project.loader_version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version,
+               "minecraft_version": project.minecraft_version,
+               "loader_version": project.loader_version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+
+    withSourcesJar()
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.base.archivesName.get()}"}
+    }
+}
+
+// Custom task to run the release build script
+tasks.register('release', Exec) {
+    group = 'build'
+    description = 'Build a release version (increments patch version by default)'
+    commandLine './build-release.sh', 'patch'
+    workingDir = project.rootDir
+}
+
+tasks.register('releaseMinor', Exec) {
+    group = 'build'
+    description = 'Build a release version with minor version increment'
+    commandLine './build-release.sh', 'minor'
+    workingDir = project.rootDir
+}
+
+tasks.register('releaseMajor', Exec) {
+    group = 'build'
+    description = 'Build a release version with major version increment'
+    commandLine './build-release.sh', 'major'
+    workingDir = project.rootDir
+}
+
