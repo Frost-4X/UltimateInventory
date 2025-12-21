@@ -136,6 +136,15 @@ public class InventoryListener implements Listener
         player.performCommand(command);
     }
 
+    /**
+     * Check if a player has access to shulkerbox features.
+     * This checks both the enable setting and permissions (if enabled).
+     * Used to control access to both opening shulker boxes and picking blocks from them.
+     */
+    private boolean hasShulkerboxAccess(Player player) {
+        return enableShulkerbox && (!usePermissions || player.hasPermission("ultimateinventory.shulkerbox"));
+    }
+
     private boolean IsShulkerBox(Material material)
     {
         switch (material)
@@ -602,6 +611,11 @@ public class InventoryListener implements Listener
             return;
         }
 
+        // Check if player has access to shulkerbox features (required for picking from shulkers)
+        if (!hasShulkerboxAccess(player)) {
+            return;
+        }
+
         // Check if player needs to be in creative mode
         if (requireCreativeForPickBlock && player.getGameMode() != GameMode.CREATIVE) {
             return;
@@ -737,7 +751,11 @@ public class InventoryListener implements Listener
      */
     public boolean handlePickBlockRequest(Player player, Material blockType) {
         if (!enablePickBlock) {
-            player.sendMessage(ChatColor.RED + "Pick block feature is disabled in plugin config");
+            return false;
+        }
+
+        // Check if player has access to shulkerbox features (required for picking from shulkers)
+        if (!hasShulkerboxAccess(player)) {
             return false;
         }
 
