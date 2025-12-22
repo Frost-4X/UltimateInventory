@@ -28,3 +28,6 @@ Thumbs.db
 run/
 logs/
 
+# Releases (optional - uncomment if you don't want to track release JARs)
+# releases/
+

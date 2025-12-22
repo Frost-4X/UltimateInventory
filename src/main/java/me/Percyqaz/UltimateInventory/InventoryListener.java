@@ -592,15 +592,19 @@ public class InventoryListener implements Listener
     @EventHandler(priority = EventPriority.NORMAL)
     public void PickBlock(PlayerInteractEvent e) {
         // Handle pick block: when vanilla pick block fails (item not in inventory), search shulker boxes
-        // Note: Middle-click in creative mode is handled client-side and may not trigger server events
-        // We'll catch it through other means (hotbar change detection)
+        // Note: Middle-click pick block is handled client-side and doesn't trigger server events
+        // The client mod should send /uipickblock commands when pick block fails
+        // This event handler is a fallback for players without the client mod, but should NOT
+        // interfere with normal right-click interactions (placing blocks, opening containers, etc.)
         
         if (e.getClickedBlock() == null) {
             return;
         }
         
-        // Accept both left and right click for pick block detection
-        if (e.getAction() != Action.RIGHT_CLICK_BLOCK && e.getAction() != Action.LEFT_CLICK_BLOCK) {
+        // NEVER trigger on right-click - right-click is for normal interactions (placing, opening containers, etc.)
+        // Only accept left-click in creative mode as a potential pick block attempt
+        // (Middle-click is the actual pick block, but it doesn't trigger server events)
+        if (e.getAction() != Action.LEFT_CLICK_BLOCK) {
             return;
         }
 
@@ -616,39 +620,18 @@ public class InventoryListener implements Listener
             return;
         }
 
-        // Check if player needs to be in creative mode
-        if (requireCreativeForPickBlock && player.getGameMode() != GameMode.CREATIVE) {
+        // Only handle pick block in creative mode (survival mode pick block is handled differently)
+        // In creative mode, left-click with empty hand might be a pick block attempt
+        if (player.getGameMode() != GameMode.CREATIVE) {
             return;
         }
 
-        // For pick block detection in creative mode:
-        // - Middle-click is handled client-side, but we can catch it via right-click with empty hand
-        // - Also accept left-click in creative mode as it might be triggered
+        // Only trigger if holding air (empty hand) - if holding an item, it's breaking/attacking, not picking
         ItemStack heldItem = player.getInventory().getItemInMainHand();
         boolean isHoldingAir = (heldItem == null || heldItem.getType() == Material.AIR);
         
-        // If player is holding a placeable item and right-clicking, they're placing a block, not picking
-        // Only trigger pick block if holding air or if it's a left-click in creative mode
-        if (e.getAction() == Action.RIGHT_CLICK_BLOCK && !isHoldingAir && heldItem != null) {
-            // Player is right-clicking with an item - they're likely placing, not picking
-            // Only exception: if they're holding the same block type they clicked (which shouldn't happen when placing)
-            if (heldItem.getType() != e.getClickedBlock().getType()) {
-                return; // Different types = placing a block, not picking
-            }
-        }
-        
-        // In creative mode, be more permissive - accept both left and right click
-        // Middle-click pick block might manifest as either action
-        if (player.getGameMode() == GameMode.CREATIVE) {
-            // In creative mode, if holding the same block type, skip (not a pick block attempt)
-            if (!isHoldingAir && heldItem != null && heldItem.getType() == e.getClickedBlock().getType()) {
-                return;
-            }
-        } else {
-            // In survival mode, only trigger on right-click with empty hand (pick block attempt)
-            if (e.getAction() != Action.RIGHT_CLICK_BLOCK || !isHoldingAir) {
-                return;
-            }
+        if (!isHoldingAir) {
+            return; // Holding an item = breaking/attacking, not pick block
         }
 
         Block clickedBlock = e.getClickedBlock();
@@ -733,12 +716,9 @@ public class InventoryListener implements Listener
             }
         } else {
             // Item not found in shulker boxes, or all slots would result in blacklisted swap
-            if (result.itemFound) {
-                // Item was found but all slots would result in placing a blacklisted item (from hotbar)
-                player.sendMessage(ChatColor.RED + "Cannot pick block: all shulker slots would result in placing a blacklisted item");
-            } else {
-                player.sendMessage(ChatColor.YELLOW + "Block not found in inventory or shulker boxes");
-            }
+            // Don't send messages for event-based detection (only for command-based)
+            // The client mod handles messaging, and event-based detection is just a fallback
+            // Messages removed to avoid spam when right-clicking blocks normally
         }
     }
 
@@ -838,12 +818,7 @@ public class InventoryListener implements Listener
             }
         } else {
             // Item not found in shulker boxes, or all slots would result in blacklisted swap
-            if (result.itemFound) {
-                // Item was found but all slots would result in placing a blacklisted item (from hotbar)
-                player.sendMessage(ChatColor.RED + "Cannot pick block: all shulker slots would result in placing a blacklisted item");
-            } else {
-                player.sendMessage(ChatColor.YELLOW + "Block not found in inventory or shulker boxes");
-            }
+            // Messages removed - let the client mod handle user feedback
             return false;
         }
     }

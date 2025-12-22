@@ -34,6 +34,47 @@ Client-side mod for the UltimateInventory plugin. When you pick a block (middle-
 
 **Note:** Normal pick block still works exactly as before. The mod only activates when vanilla pick block fails to find the item in your inventory.
 
+## Building Releases
+
+This project includes a release build script that automatically:
+- Increments the version number
+- Builds the mod
+- Places the JAR in the `releases/` folder
+- Removes old releases for the same version
+
+### Using the Script
+
+```bash
+# Patch version (default): 1.0.0 -> 1.0.1
+./build-release.sh
+# or
+./build-release.sh patch
+
+# Minor version: 1.0.0 -> 1.1.0
+./build-release.sh minor
+
+# Major version: 1.0.0 -> 2.0.0
+./build-release.sh major
+```
+
+### Using Gradle Tasks (Alternative)
+
+You can also trigger the release script via Gradle:
+
+```bash
+# Patch version increment (default)
+./gradlew release
+
+# Minor version increment
+./gradlew releaseMinor
+
+# Major version increment
+./gradlew releaseMajor
+```
+
+The release JARs are placed in the `releases/` directory with the naming convention:
+`ultimate-inventory-shulker-pick-{minecraft_version}-{mod_version}.jar`
+
 ## License
 
 MIT License
