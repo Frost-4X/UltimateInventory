@@ -12,10 +12,18 @@ Client-side mod for the UltimateInventory plugin. When you pick a block (middle-
 
 ## Requirements
 
+### Runtime Requirements
+
 - Minecraft 1.21.5
 - Fabric Loader 0.16.9+
 - Fabric API (recommended)
 - [UltimateInventory plugin](https://github.com/MaxAdams98/UltimateInventory) on the server
+
+### Development Requirements
+
+- **Java 21+** (JDK 21 or higher)
+- **Gradle** (included via Gradle Wrapper - `./gradlew`)
+- **Litematica** (optional, for Mixin development - place `litematica-fabric-*.jar` in `libs/` folder)
 
 ## Installation
 
@@ -34,13 +42,48 @@ Client-side mod for the UltimateInventory plugin. When you pick a block (middle-
 
 **Note:** Normal pick block still works exactly as before. The mod only activates when vanilla pick block fails to find the item in your inventory.
 
+## Development
+
+### Building from Source
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/MaxAdams98/UltimateInventory.git
+   cd UltimateInventory/UILitematicaShulkerPick
+   ```
+
+2. Build the mod:
+   ```bash
+   ./gradlew clean build
+   ```
+
+3. The compiled JAR will be in `build/libs/ultimate-inventory-shulker-pick-{version}.jar`
+
+4. Copy the JAR to your `.minecraft/mods/` folder
+
+### Development Setup
+
+1. **Litematica (Optional):** If you want to develop/test the Litematica integration:
+   - Download or build Litematica for Minecraft 1.21.5
+   - Place `litematica-fabric-*.jar` in the `libs/` folder
+   - The build script will automatically find and use it
+
+2. **IDE Setup:**
+   - Import the project as a Gradle project
+   - Your IDE should automatically detect the Gradle Wrapper
+   - Ensure your IDE is using Java 21
+
+3. **Running in Development:**
+   - Use the Fabric development environment
+   - Run `./gradlew runClient` (if configured) or use your IDE's run configuration
+
 ## Building Releases
 
 This project includes a release build script that automatically:
 - Increments the version number
 - Builds the mod
 - Places the JAR in the `releases/` folder
-- Removes old releases for the same Minecraft version
+- Removes old releases for the same version
 
 ### Using the Script
 

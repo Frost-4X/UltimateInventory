@@ -5,6 +5,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.ItemStack;
 import me.maxadams98.ultimateinventory.client.util.PickBlockUtils;
+import me.maxadams98.ultimateinventory.client.PrinterIntegration;
 
 /**
  * Implementation of Litematica's pick block event listener interface.
@@ -72,22 +73,29 @@ class LitematicaPickBlockListenerImpl {
         // Wait a tick to let Litematica's pick block complete
         client.execute(() -> {
             System.out.println("[UltimateInventory] Checking if item was picked: " + (lastPickBlockStack.isEmpty() ? "empty" : lastPickBlockStack.getItem().toString()));
-            boolean itemFound = PickBlockUtils.itemExistsInInventory(player, lastPickBlockStack);
-            System.out.println("[UltimateInventory] Item found in inventory: " + itemFound);
-            
-            if (!itemFound) {
-                System.out.println("[UltimateInventory] Item not found - checking hotbar slots...");
+
+            // Check if we should trigger a shulker search (includes delay to prevent false positives during item usage)
+            if (PickBlockUtils.shouldTriggerShulkerSearch(player, lastPickBlockStack)) {
+                // Item has been missing long enough to warrant a search
                 if (PickBlockUtils.areAllHotbarSlotsBlacklisted(player)) {
-                    System.out.println("[UltimateInventory] All hotbar slots blacklisted");
+                    System.out.println("[UltimateInventory] All hotbar slots blacklisted - cannot swap");
                     PickBlockUtils.sendBlacklistedSlotsError(player);
                     lastPickBlockStack = ItemStack.EMPTY;
                     return;
                 }
-                
+
+                // Check if item exists anywhere in inventory (including blacklisted slots)
+                boolean itemExistsAnywhere = PickBlockUtils.itemExistsInInventory(player, lastPickBlockStack);
+                if (itemExistsAnywhere) {
+                    System.out.println("[UltimateInventory] Item exists but only in blacklisted/main inventory slots - triggering shulker search");
+                } else {
+                    System.out.println("[UltimateInventory] Item not found anywhere in inventory - triggering shulker search");
+                }
+
                 System.out.println("[UltimateInventory] Triggering shulker box search for: " + lastPickBlockStack.getItem().toString());
+                // Pause printer to prevent conflicts during shulker operations
+                PrinterIntegration.pausePrinterForShulkerAction(20); // 1 second at 20 TPS
                 PickBlockUtils.sendPickBlockCommand(player, lastPickBlockStack);
-            } else {
-                System.out.println("[UltimateInventory] Item was successfully picked by Litematica, no action needed");
             }
             
             lastPickBlockStack = ItemStack.EMPTY;

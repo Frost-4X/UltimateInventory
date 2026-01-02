@@ -3,12 +3,12 @@ plugins {
     id 'maven-publish'
 }
 
-version = project.mod_version
+version = "${project.mod_version}-${project.minecraft_version}"
 group = project.maven_group
 
 base {
     // Include Minecraft version in filename: ui-litematica-shulker-pick-1.0.0-1.21.5.jar
-    archivesName = "${project.archives_base_name}-${project.minecraft_version}"
+    archivesName = project.archives_base_name
 }
 
 loom {
@@ -127,30 +127,30 @@ java {
 }
 
 jar {
-    from("LICENSE") {
-        rename { "${it}_${project.base.archivesName.get()}"}
+    // Include LICENSE if it exists
+    if (file("LICENSE").exists()) {
+        from("LICENSE") {
+            rename { "${it}_${project.base.archivesName.get()}"}
+        }
     }
 }
 
-// Custom task to run the release build script
-tasks.register('release', Exec) {
-    group = 'build'
-    description = 'Build a release version (increments patch version by default)'
-    commandLine './build-release.sh', 'patch'
-    workingDir = project.rootDir
+// Release build tasks
+task release(type: Exec) {
+    description = 'Build and release with patch version increment'
+    group = 'release'
+    commandLine 'bash', 'build-release.sh', 'patch'
 }
 
-tasks.register('releaseMinor', Exec) {
-    group = 'build'
-    description = 'Build a release version with minor version increment'
-    commandLine './build-release.sh', 'minor'
-    workingDir = project.rootDir
+task releaseMinor(type: Exec) {
+    description = 'Build and release with minor version increment'
+    group = 'release'
+    commandLine 'bash', 'build-release.sh', 'minor'
 }
 
-tasks.register('releaseMajor', Exec) {
-    group = 'build'
-    description = 'Build a release version with major version increment'
-    commandLine './build-release.sh', 'major'
-    workingDir = project.rootDir
+task releaseMajor(type: Exec) {
+    description = 'Build and release with major version increment'
+    group = 'release'
+    commandLine 'bash', 'build-release.sh', 'major'
 }
 

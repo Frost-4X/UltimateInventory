@@ -51,3 +51,49 @@ If you find any duplication bugs (or bugs in general) please immediately report 
 No other known issues
 
 Got a feature request? Ask on the forums or open an issue
+
+## Development
+
+### Requirements
+
+- **Java 17+** (JDK 17 or higher)
+- **Maven 3.6+** (for building the Bukkit plugin)
+- **Minecraft Server** (Paper or Spigot 1.21.3+) for testing
+
+### Building the Plugin
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/MaxAdams98/UltimateInventory.git
+   cd UltimateInventory
+   ```
+
+2. Build the plugin (choose one method):
+
+   **Option A: Build and install to server automatically**
+   ```bash
+   ./build-and-install.sh /path/to/your/server/plugins
+   ```
+   
+   Or set an environment variable for convenience:
+   ```bash
+   export SERVER_PLUGINS_PATH=/path/to/your/server/plugins
+   ./build-and-install.sh
+   ```
+
+   **Option B: Build manually**
+   ```bash
+   mvn clean package
+   ```
+   The compiled JAR will be in `target/UltimateInventory-1.7.1.jar`
+   
+   Then manually copy it to your server's `plugins/` folder
+
+### Building the Client Mod
+
+The client mod is located in the `UILitematicaShulkerPick/` directory. See [UILitematicaShulkerPick/README.md](UILitematicaShulkerPick/README.md) for build instructions.
+
+**Requirements for Client Mod:**
+- **Java 21+** (JDK 21 or higher)
+- **Gradle** (included via Gradle Wrapper)
+- **Fabric Loader** and **Fabric API** for testing

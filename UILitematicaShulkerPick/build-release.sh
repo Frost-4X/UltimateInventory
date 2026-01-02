@@ -30,6 +30,7 @@ fi
 
 CURRENT_VERSION=$(grep "^mod_version=" "$GRADLE_PROPERTIES" | cut -d'=' -f2)
 MINECRAFT_VERSION=$(grep "^minecraft_version=" "$GRADLE_PROPERTIES" | cut -d'=' -f2)
+ARCHIVES_BASE_NAME=$(grep "^archives_base_name=" "$GRADLE_PROPERTIES" | cut -d'=' -f2)
 
 if [ -z "$CURRENT_VERSION" ]; then
     echo "Error: Could not find mod_version in $GRADLE_PROPERTIES"
@@ -38,6 +39,11 @@ fi
 
 if [ -z "$MINECRAFT_VERSION" ]; then
     echo "Error: Could not find minecraft_version in $GRADLE_PROPERTIES"
+    exit 1
+fi
+
+if [ -z "$ARCHIVES_BASE_NAME" ]; then
+    echo "Error: Could not find archives_base_name in $GRADLE_PROPERTIES"
     exit 1
 fi
 
@@ -90,13 +96,16 @@ mkdir -p "$RELEASES_DIR"
 
 # Remove old JARs for the same Minecraft version (but keep sources if user wants them)
 echo "Removing old releases for Minecraft $MINECRAFT_VERSION..."
-find "$RELEASES_DIR" -name "*${MINECRAFT_VERSION}-*.jar" -type f ! -name "*-sources.jar" -delete
+find "$RELEASES_DIR" -name "*${MINECRAFT_VERSION}.jar" -type f ! -name "*-sources.jar" -delete
 
 # Copy new JAR to releases (excluding sources JAR)
-NEW_JAR=$(find build/libs -name "*-${MINECRAFT_VERSION}-*.jar" -type f ! -name "*-sources.jar" | head -1)
+NEW_JAR=$(find build/libs -name "*-${MINECRAFT_VERSION}.jar" -type f ! -name "*-sources.jar" | head -1)
 
 if [ -z "$NEW_JAR" ]; then
     echo "Error: Could not find built JAR file!"
+    echo "Expected pattern: *-${MINECRAFT_VERSION}.jar"
+    echo "Found in build/libs:"
+    ls -la build/libs/*.jar 2>/dev/null || echo "  (no JARs found)"
     exit 1
 fi
 
@@ -112,4 +121,3 @@ echo ""
 echo "To commit the version change:"
 echo "  git add $GRADLE_PROPERTIES $RELEASES_DIR/"
 echo "  git commit -m \"Bump version to $NEW_VERSION for MC $MINECRAFT_VERSION\""
-
