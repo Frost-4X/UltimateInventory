@@ -3,6 +3,7 @@ package me.maxadams98.ultimateinventory.client;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import me.maxadams98.ultimateinventory.client.litematica.LitematicaIntegration;
+import me.maxadams98.ultimateinventory.client.util.PickBlockUtils;
 
 /**
  * Ultimate Inventory - Litematica Support Mod
@@ -18,6 +19,9 @@ public class UltimateInventoryClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        // Reset server compatibility check for initial connection
+        PickBlockUtils.resetServerCompatibility();
+
         // Register Litematica pick block listener
         // This will only succeed if Litematica is present
         LitematicaIntegration.register();

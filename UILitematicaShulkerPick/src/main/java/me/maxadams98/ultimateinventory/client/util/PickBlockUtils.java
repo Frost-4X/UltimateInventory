@@ -24,7 +24,51 @@ public class PickBlockUtils {
     private static ItemStack lastCheckedItem = ItemStack.EMPTY;
     private static int itemMissingTicks = 0;
     private static final int MISSING_ITEM_DELAY = 3; // Wait 3 ticks before triggering search (prevents false positives during item use)
+
+    // Server compatibility tracking
+    private static boolean serverHasPlugin = true; // Assume server has plugin until proven otherwise
+    private static boolean compatibilityChecked = false;
+    private static long lastErrorMessageTime = 0;
+    private static final int ERROR_MESSAGE_COOLDOWN = 300; // 15 seconds between error messages
     
+    /**
+     * Sends a pick block command to the server safely.
+     * Includes error handling for servers without the UltimateInventory plugin.
+     */
+    private static void sendCommandSafely(ClientPlayerEntity player, String command) {
+        if (!serverHasPlugin) {
+            System.out.println("[UltimateInventory] Skipping command - server doesn't have UltimateInventory plugin: " + command);
+            return;
+        }
+
+        try {
+            System.out.println("[UltimateInventory] Sending command: " + command);
+            player.networkHandler.sendCommand(command);
+
+            // If we get here without exception, mark compatibility as checked
+            if (!compatibilityChecked) {
+                compatibilityChecked = true;
+                System.out.println("[UltimateInventory] Server compatibility verified - UltimateInventory plugin detected");
+            }
+        } catch (Exception e) {
+            if (serverHasPlugin) {
+                // First failure - disable plugin detection and warn user
+                serverHasPlugin = false;
+                System.out.println("[UltimateInventory] ERROR: Server doesn't appear to have UltimateInventory plugin!");
+                System.out.println("[UltimateInventory] This mod requires the UltimateInventory plugin on the server.");
+                System.out.println("[UltimateInventory] Please install the plugin or disable this mod.");
+
+                // Rate limit error messages to avoid spam
+                long currentTime = System.currentTimeMillis();
+                if (currentTime - lastErrorMessageTime > ERROR_MESSAGE_COOLDOWN * 50) {
+                    player.sendMessage(Text.literal("§c[UltimateInventory] Server missing UltimateInventory plugin! Please install it."), false);
+                    lastErrorMessageTime = currentTime;
+                }
+            }
+            System.out.println("[UltimateInventory] Command failed: " + e.getMessage());
+        }
+    }
+
     /**
      * Sends a pick block command to the server.
      * Converts the item to Bukkit-style material name and sends /uipickblock command.
@@ -63,7 +107,7 @@ public class PickBlockUtils {
         }
         
         String command = "uipickblock " + materialName;
-        player.networkHandler.sendCommand(command);
+        sendCommandSafely(player, command);
     }
     
     /**
@@ -215,6 +259,16 @@ public class PickBlockUtils {
 
         System.out.println("[UltimateInventory] Item still missing but waiting (" + itemMissingTicks + "/" + MISSING_ITEM_DELAY + " ticks)");
         return false;
+    }
+
+    /**
+     * Resets server compatibility check when joining a new server.
+     * Call this when connecting to a server or when mod initializes.
+     */
+    public static void resetServerCompatibility() {
+        serverHasPlugin = true;
+        compatibilityChecked = false;
+        System.out.println("[UltimateInventory] Reset server compatibility check for new connection");
     }
 
     /**
