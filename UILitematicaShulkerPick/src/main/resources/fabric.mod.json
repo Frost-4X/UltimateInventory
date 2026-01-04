@@ -2,21 +2,22 @@
   "schemaVersion": 1,
   "id": "ultimateinventory_client",
   "version": "${version}",
-  "name": "Ultimate Inventory Shulker Pick",
-  "description": "Client-side mod for UltimateInventory plugin - enables pick block from shulker boxes",
+  "name": "UltimateInventory - Litematica Support",
+  "description": "Client-side mod for UltimateInventory plugin. Enables automatic pick block from shulker boxes when using Litematica's pick block feature. Seamlessly searches your shulker boxes and places items in your hotbar when vanilla pick block fails. Note: Vanilla pick block is handled server-side by the plugin (Paper 1.21.10+), so this client mod is only needed for Litematica integration.",
   "authors": [
-    "Percyqaz"
+    "maxadams98"
   ],
   "contact": {
-    "homepage": "https://github.com/Percyqaz/UltimateInventory",
-    "sources": "https://github.com/Percyqaz/UltimateInventory"
+    "homepage": "https://github.com/maxadams98/UltimateInventory",
+    "sources": "https://github.com/maxadams98/UltimateInventory",
+    "issues": "https://github.com/maxadams98/UltimateInventory/issues"
   },
   "license": "MIT",
   "icon": "assets/ultimateinventory_client/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
-      "me.percyqaz.ultimateinventory.client.UltimateInventoryClient"
+      "me.maxadams98.ultimateinventory.client.UltimateInventoryClient"
     ]
   },
   "mixins": [
@@ -29,6 +30,15 @@
   },
   "suggests": {
     "fabric-api": "*"
+  },
+  "custom": {
+    "modmenu": {
+      "links": {
+        "modmenu.discord": "https://discord.gg/example",
+        "modmenu.curseforge": "https://www.curseforge.com/minecraft/bukkit-plugins/ultimateinventory",
+        "modmenu.modrinth": "https://modrinth.com/mod/ultimateinventory"
+      }
+    }
   }
 }
 

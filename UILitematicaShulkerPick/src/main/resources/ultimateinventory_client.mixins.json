@@ -1,7 +1,7 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "me.percyqaz.ultimateinventory.client.mixins",
+  "package": "me.maxadams98.ultimateinventory.client.mixins",
   "compatibilityLevel": "JAVA_21",
   "mixins": [],
   "client": [

@@ -19,6 +19,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
+import io.papermc.paper.event.player.PlayerPickBlockEvent;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -589,13 +590,132 @@ public class InventoryListener implements Listener
         }
     }
 
+    /**
+     * Handler for Paper's PlayerPickBlockEvent.
+     * This is the primary way to handle pick block requests when running on Paper 1.21.10+.
+     * When the source slot is -1, it means the item isn't in the player's inventory,
+     * so we search shulker boxes and handle the swap.
+     * 
+     * This eliminates the need for a client-side mod - everything is handled server-side!
+     */
+    @EventHandler(priority = EventPriority.NORMAL)
+    public void onPlayerPickBlock(PlayerPickBlockEvent e) {
+        Player player = e.getPlayer();
+        
+        // Check if pick block is enabled
+        if (!enablePickBlock) {
+            return;
+        }
+        
+        // Check if player has access to shulkerbox features (required for picking from shulkers)
+        if (!hasShulkerboxAccess(player)) {
+            return;
+        }
+        
+        // Check if player needs to be in creative mode
+        if (requireCreativeForPickBlock && player.getGameMode() != GameMode.CREATIVE) {
+            return;
+        }
+        
+        // If sourceSlot is -1, the item isn't in the player's inventory
+        // This is when we need to search shulker boxes
+        if (e.getSourceSlot() != -1) {
+            return; // Item is already in inventory, let vanilla handle it
+        }
+        
+        int targetSlot = e.getTargetSlot();
+        
+        // Get the item that will be swapped into the shulker (from target slot)
+        ItemStack itemToSwapIntoShulker = player.getInventory().getItem(targetSlot);
+        
+        // Check if all hotbar slots are blacklisted
+        if (areAllHotbarSlotsBlacklisted(player)) {
+            e.setCancelled(true);
+            player.sendMessage(ChatColor.RED + "Cannot pick block: all hotbar slots contain items that cannot be swapped");
+            return;
+        }
+        
+        // Check if the item to swap in is blacklisted
+        if (itemToSwapIntoShulker != null && itemToSwapIntoShulker.getType() != Material.AIR 
+                && isBlacklistedForShulkerSwap(itemToSwapIntoShulker.getType())) {
+            // This slot would result in placing a blacklisted item, try to find a better slot
+            int betterSlot = findFreeHotbarSlotExcluding(player, targetSlot);
+            if (betterSlot != -1) {
+                e.setTargetSlot(betterSlot);
+                targetSlot = betterSlot;
+                itemToSwapIntoShulker = player.getInventory().getItem(targetSlot);
+            } else {
+                e.setCancelled(true);
+                player.sendMessage(ChatColor.RED + "Cannot pick block: all available hotbar slots would result in placing a blacklisted item");
+                return;
+            }
+        }
+        
+        // We need to determine what item the player is trying to pick
+        // Since PlayerPickBlockEvent doesn't directly tell us, we'll check the target slot
+        // after the event would normally complete, OR we can use the player's target block
+        // However, the simplest approach: check what item SHOULD be at the target slot
+        // For now, we'll use a different approach - we'll cancel the event and handle it manually
+        // by getting the block the player is looking at
+        
+        // Get the block the player is targeting
+        Block targetBlock = player.getTargetBlock(null, 5); // 5 block reach
+        if (targetBlock == null || targetBlock.getType() == Material.AIR) {
+            return; // Can't determine what to pick
+        }
+        
+        Material blockType = targetBlock.getType();
+        
+        // Don't pick air or invalid blocks
+        if (blockType == Material.AIR || blockType == Material.BARRIER || blockType == Material.BEDROCK) {
+            return;
+        }
+        
+        // Create an ItemStack representing the block
+        ItemStack targetItem = new ItemStack(blockType, 1);
+        
+        // Search for item in shulker boxes
+        int lastHotbarSlot = playerLastHotbarSlot.getOrDefault(player.getUniqueId(), player.getInventory().getHeldItemSlot());
+        FindItemResult result = findItemInShulkers(player, targetItem, lastHotbarSlot, targetSlot, itemToSwapIntoShulker);
+        
+        if (result.swapData != null) {
+            // Found valid slot in shulker box - perform the swap
+            ItemStack shulkerItem;
+            if (result.swapData.shulkerSlot == 40) {
+                shulkerItem = player.getInventory().getItemInOffHand();
+            } else {
+                shulkerItem = player.getInventory().getItem(result.swapData.shulkerSlot);
+            }
+            
+            if (shulkerItem != null && IsShulkerBox(shulkerItem.getType())) {
+                // Cancel the event since we're handling it ourselves
+                e.setCancelled(true);
+                
+                // Perform swap directly
+                performPickBlockSwap(player, result.swapData, shulkerItem);
+                
+                // Switch player's selected hotbar slot to the target slot
+                player.getInventory().setHeldItemSlot(targetSlot);
+                
+                // Play sound
+                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 0.5f, 1.2f);
+                player.sendMessage(ChatColor.GREEN + "Picked " + blockType.name().toLowerCase().replace("_", " ") + " from shulker box");
+            }
+        } else {
+            // Item not found in shulker boxes
+            e.setCancelled(true);
+            if (result.itemFound) {
+                player.sendMessage(ChatColor.RED + "Cannot pick block: all shulker slots would result in placing a blacklisted item");
+            } else {
+                player.sendMessage(ChatColor.YELLOW + "Block not found in inventory or shulker boxes");
+            }
+        }
+    }
+
     @EventHandler(priority = EventPriority.NORMAL)
     public void PickBlock(PlayerInteractEvent e) {
-        // Handle pick block: when vanilla pick block fails (item not in inventory), search shulker boxes
-        // Note: Middle-click pick block is handled client-side and doesn't trigger server events
-        // The client mod should send /uipickblock commands when pick block fails
-        // This event handler is a fallback for players without the client mod, but should NOT
-        // interfere with normal right-click interactions (placing blocks, opening containers, etc.)
+        // Legacy handler for pick block detection (fallback for non-Paper servers or when Paper event doesn't fire)
+        // This is less reliable than PlayerPickBlockEvent but provides backwards compatibility
         
         if (e.getClickedBlock() == null) {
             return;
@@ -712,7 +832,7 @@ public class InventoryListener implements Listener
                 
                 // Play sound
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 0.5f, 1.2f);
-                player.sendMessage(ChatColor.GREEN + "Picked " + blockType.name().toLowerCase().replace("_", " ") + " from shulker box");
+                // player.sendMessage(ChatColor.GREEN + "Picked " + blockType.name().toLowerCase().replace("_", " ") + " from shulker box");
             }
         } else {
             // Item not found in shulker boxes, or all slots would result in blacklisted swap
@@ -809,7 +929,7 @@ public class InventoryListener implements Listener
                 
                 // Play sound
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 0.5f, 1.2f);
-                player.sendMessage(ChatColor.GREEN + "Picked " + blockType.name().toLowerCase().replace("_", " ") + " from shulker box");
+                // player.sendMessage(ChatColor.GREEN + "Picked " + blockType.name().toLowerCase().replace("_", " ") + " from shulker box");
                 return true;
             } else {
                 plugin.getLogger().warning("[PickBlock] Shulker item is null or not a shulker box");

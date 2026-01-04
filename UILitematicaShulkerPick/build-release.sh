@@ -96,14 +96,14 @@ mkdir -p "$RELEASES_DIR"
 
 # Remove old JARs for the same Minecraft version (but keep sources if user wants them)
 echo "Removing old releases for Minecraft $MINECRAFT_VERSION..."
-find "$RELEASES_DIR" -name "*${MINECRAFT_VERSION}-*.jar" -type f ! -name "*-sources.jar" -delete
+find "$RELEASES_DIR" -name "*${MINECRAFT_VERSION}.jar" -type f ! -name "*-sources.jar" -delete
 
 # Copy new JAR to releases (excluding sources JAR)
-NEW_JAR=$(find build/libs -name "*-${MINECRAFT_VERSION}-*.jar" -type f ! -name "*-sources.jar" | head -1)
+NEW_JAR=$(find build/libs -name "*-${MINECRAFT_VERSION}.jar" -type f ! -name "*-sources.jar" | head -1)
 
 if [ -z "$NEW_JAR" ]; then
     echo "Error: Could not find built JAR file!"
-    echo "Expected pattern: *-${MINECRAFT_VERSION}-*.jar"
+    echo "Expected pattern: *-${MINECRAFT_VERSION}.jar"
     echo "Found in build/libs:"
     ls -la build/libs/*.jar 2>/dev/null || echo "  (no JARs found)"
     exit 1

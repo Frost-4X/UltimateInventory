@@ -4,6 +4,7 @@ build/
 !build/libs/
 *.jar
 !gradle-wrapper.jar
+!releases/*.jar
 
 # Development dependencies (Litematica JAR for Mixin compilation)
 # libs/

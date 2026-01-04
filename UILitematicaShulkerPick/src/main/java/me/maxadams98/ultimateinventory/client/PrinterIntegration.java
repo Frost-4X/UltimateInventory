@@ -1,4 +1,4 @@
-package me.percyqaz.ultimateinventory.client;
+package me.maxadams98.ultimateinventory.client;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -125,5 +125,3 @@ public class PrinterIntegration {
         }
     }
 }
-
-
