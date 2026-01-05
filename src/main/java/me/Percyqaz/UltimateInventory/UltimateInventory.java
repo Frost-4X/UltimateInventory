@@ -52,13 +52,27 @@ public class UltimateInventory extends JavaPlugin {
             InventoryListener inventoryListener = new InventoryListener(this, config, isPaper, isAdvancedEnderchestPresent);
             pm.registerEvents(inventoryListener, this);
 
-            // Register pick block command for client mod communication
+            // Check if Paper's PlayerPickBlockEvent is available (Paper 1.21.10+)
+            boolean paperPickBlockEventAvailable = false;
+            try {
+                Class.forName("io.papermc.paper.event.player.PlayerPickBlockEvent");
+                paperPickBlockEventAvailable = true;
+                this.getLogger().info("Paper's PlayerPickBlockEvent detected - using native pick block handling (no client mod required!)");
+            } catch (ClassNotFoundException e) {
+                this.getLogger().info("Paper's PlayerPickBlockEvent not available - falling back to legacy pick block detection");
+            }
+
+            // Register pick block command for client mod communication (fallback for older versions)
             PickBlockCommand pickBlockCommand = new PickBlockCommand(this, inventoryListener);
             org.bukkit.command.PluginCommand cmd = this.getCommand("uipickblock");
             if (cmd != null) {
                 cmd.setExecutor(pickBlockCommand);
                 cmd.setPermission(null);
-                this.getLogger().info("Registered /uipickblock command");
+                if (!paperPickBlockEventAvailable) {
+                    this.getLogger().info("Registered /uipickblock command (for client mod compatibility)");
+                } else {
+                    this.getLogger().info("Registered /uipickblock command (available for legacy support)");
+                }
             } else {
                 this.getLogger().severe("Failed to register /uipickblock command! Check plugin.yml");
             }

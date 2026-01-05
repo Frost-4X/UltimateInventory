@@ -116,7 +116,7 @@ You can also trigger the release script via Gradle:
 ```
 
 The release JARs are placed in the `releases/` directory with the naming convention:
-`ultimate-inventory-shulker-pick-{minecraft_version}-{mod_version}.jar`
+`ui-litematica-shulker-pick-{minecraft_version}-{mod_version}.jar`
 
 ## License
 

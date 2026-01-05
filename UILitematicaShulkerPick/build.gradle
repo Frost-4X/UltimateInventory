@@ -3,10 +3,11 @@ plugins {
     id 'maven-publish'
 }
 
-version = "${project.minecraft_version}-${project.mod_version}"
+version = "${project.mod_version}-${project.minecraft_version}"
 group = project.maven_group
 
 base {
+    // Include Minecraft version in filename: ui-litematica-shulker-pick-1.0.0-1.21.5.jar
     archivesName = project.archives_base_name
 }
 
