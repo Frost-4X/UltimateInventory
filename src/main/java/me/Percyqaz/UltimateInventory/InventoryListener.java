@@ -1107,7 +1107,7 @@ public class InventoryListener implements Listener
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void InventoryClose(InventoryCloseEvent e) {
-        this.plugin.getLogger().info("Inventory Close Event");
+//        this.plugin.getLogger().info("Inventory Close Event");
 
         // If closed inventory is a shulker box
         if (openShulkerBoxes.containsKey(e.getPlayer().getUniqueId())) {
@@ -1185,7 +1185,7 @@ public class InventoryListener implements Listener
 
         if (e.getPlayer().getOpenInventory().getType() != InventoryType.SHULKER_BOX)
         {
-            this.plugin.getLogger().info("Updating last opened menu");
+//            this.plugin.getLogger().info("Updating last opened menu");
             playerLastOpenedMenu.put(e.getPlayer().getUniqueId(), e.getView().title().toString());
         }
     }
