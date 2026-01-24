@@ -1,15 +1,29 @@
 package me.maxadams98.ultimateinventory.client.util;
 
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
+import net.minecraft.world.GameMode;
 
 /**
  * Utility methods for pick block functionality.
  * Shared between Litematica event listener and mixin handler.
  */
 public class PickBlockUtils {
+
+    /**
+     * Check if the player is in survival mode.
+     * Uses the interaction manager to get the current game mode.
+     */
+    public static boolean isPlayerInSurvivalMode() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.interactionManager == null) {
+            return false;
+        }
+        return client.interactionManager.getCurrentGameMode() == GameMode.SURVIVAL;
+    }
 
     // Prevent rapid-fire shulker searches (cooldown in ticks)
     private static long lastShulkerSearchTime = 0;
@@ -143,8 +157,15 @@ public class PickBlockUtils {
      * Sends a pick block command to the server.
      * Converts the item to Bukkit-style material name and sends /uipickblock command.
      * Includes cooldowns to prevent rapid-fire and repetitive searches.
+     * Only operates for survival mode players - creative/spectator/adventure use default behavior.
      */
     public static void sendPickBlockCommand(ClientPlayerEntity player, ItemStack targetItem) {
+        // Only handle pick block for survival mode players
+        // Creative/spectator/adventure should use default behavior
+        if (!isPlayerInSurvivalMode()) {
+            return;
+        }
+
         // Only skip if we've confirmed the server doesn't have the plugin (after multiple failures)
         if (!serverHasPlugin && failedCommandCount >= MAX_COMMAND_FAILURES) {
             System.out.println("[UltimateInventory] Skipping command - server confirmed incompatible: " + targetItem.getItem().toString());
@@ -304,8 +325,14 @@ public class PickBlockUtils {
      * Checks if a shulker search should be triggered for a missing item.
      * Includes delay to prevent false positives during item usage.
      * Returns true if search should be triggered, false if we should wait.
+     * Only triggers for survival mode players - creative/spectator/adventure use default behavior.
      */
     public static boolean shouldTriggerShulkerSearch(ClientPlayerEntity player, ItemStack targetItem) {
+        // Only handle pick block for survival mode players
+        if (!isPlayerInSurvivalMode()) {
+            return false;
+        }
+
         System.out.println("[UltimateInventory] Checking if shulker search should be triggered for: " + targetItem.getItem().toString());
 
         boolean itemAvailable = itemExistsInNonBlacklistedHotbarSlot(player, targetItem);

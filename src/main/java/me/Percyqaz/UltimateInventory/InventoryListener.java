@@ -607,13 +607,14 @@ public class InventoryListener implements Listener
             return;
         }
         
-        // Check if player has access to shulkerbox features (required for picking from shulkers)
-        if (!hasShulkerboxAccess(player)) {
+        // Only handle pick block for survival mode players
+        // Creative/spectator/adventure should use default behavior
+        if (player.getGameMode() != GameMode.SURVIVAL) {
             return;
         }
         
-        // Check if player needs to be in creative mode
-        if (requireCreativeForPickBlock && player.getGameMode() != GameMode.CREATIVE) {
+        // Check if player has access to shulkerbox features (required for picking from shulkers)
+        if (!hasShulkerboxAccess(player)) {
             return;
         }
         
@@ -623,40 +624,38 @@ public class InventoryListener implements Listener
             return; // Item is already in inventory, let vanilla handle it
         }
         
-        int targetSlot = e.getTargetSlot();
-        
-        // Get the item that will be swapped into the shulker (from target slot)
-        ItemStack itemToSwapIntoShulker = player.getInventory().getItem(targetSlot);
-        
-        // Check if all hotbar slots are blacklisted
-        if (areAllHotbarSlotsBlacklisted(player)) {
+        // Find the best hotbar slot using priority:
+        // 1. Empty hotbar slot
+        // 2. Active hotbar slot (if not blacklisted)
+        // 3. Next non-blacklisted slot to the right (wrapping)
+        int targetSlot = findBestHotbarSlotForPick(player);
+        if (targetSlot == -1) {
             e.setCancelled(true);
             player.sendMessage(ChatColor.RED + "Cannot pick block: all hotbar slots contain items that cannot be swapped");
             return;
         }
         
-        // Check if the item to swap in is blacklisted
-        if (itemToSwapIntoShulker != null && itemToSwapIntoShulker.getType() != Material.AIR 
-                && isBlacklistedForShulkerSwap(itemToSwapIntoShulker.getType())) {
-            // This slot would result in placing a blacklisted item, try to find a better slot
-            int betterSlot = findFreeHotbarSlotExcluding(player, targetSlot);
-            if (betterSlot != -1) {
-                e.setTargetSlot(betterSlot);
-                targetSlot = betterSlot;
-                itemToSwapIntoShulker = player.getInventory().getItem(targetSlot);
-            } else {
-                e.setCancelled(true);
-                player.sendMessage(ChatColor.RED + "Cannot pick block: all available hotbar slots would result in placing a blacklisted item");
-                return;
+        // Update the event's target slot to our calculated best slot
+        e.setTargetSlot(targetSlot);
+        
+        // Get the item that will be displaced from the target slot
+        ItemStack itemToDisplace = player.getInventory().getItem(targetSlot);
+        
+        // Determine what happens to the displaced item:
+        // 1. If slot is empty, nothing to do
+        // 2. Try to move displaced item to spare inventory slot (not hotbar)
+        // 3. Only swap into shulker if no empty inventory slots
+        ItemStack itemToSwapIntoShulker = null;
+        int emptyInventorySlot = -1;
+        
+        if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR) {
+            // Try to find an empty inventory slot to move the displaced item
+            emptyInventorySlot = findEmptyInventorySlot(player);
+            if (emptyInventorySlot == -1) {
+                // No empty inventory slot, item will go into shulker
+                itemToSwapIntoShulker = itemToDisplace;
             }
         }
-        
-        // We need to determine what item the player is trying to pick
-        // Since PlayerPickBlockEvent doesn't directly tell us, we'll check the target slot
-        // after the event would normally complete, OR we can use the player's target block
-        // However, the simplest approach: check what item SHOULD be at the target slot
-        // For now, we'll use a different approach - we'll cancel the event and handle it manually
-        // by getting the block the player is looking at
         
         // Get the block the player is targeting
         Block targetBlock = player.getTargetBlock(null, 5); // 5 block reach
@@ -691,6 +690,12 @@ public class InventoryListener implements Listener
                 // Cancel the event since we're handling it ourselves
                 e.setCancelled(true);
                 
+                // Move displaced item to empty inventory slot if available
+                if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR && emptyInventorySlot != -1) {
+                    player.getInventory().setItem(emptyInventorySlot, itemToDisplace.clone());
+                    player.getInventory().setItem(targetSlot, null); // Clear the slot before swap
+                }
+                
                 // Perform swap directly
                 performPickBlockSwap(player, result.swapData, shulkerItem);
                 
@@ -699,7 +704,6 @@ public class InventoryListener implements Listener
                 
                 // Play sound
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 0.5f, 1.2f);
-                player.sendMessage(ChatColor.GREEN + "Picked " + blockType.name().toLowerCase().replace("_", " ") + " from shulker box");
             }
         } else {
             // Item not found in shulker boxes
@@ -715,131 +719,10 @@ public class InventoryListener implements Listener
     @EventHandler(priority = EventPriority.NORMAL)
     public void PickBlock(PlayerInteractEvent e) {
         // Legacy handler for pick block detection (fallback for non-Paper servers or when Paper event doesn't fire)
-        // This is less reliable than PlayerPickBlockEvent but provides backwards compatibility
-        
-        if (e.getClickedBlock() == null) {
-            return;
-        }
-        
-        // NEVER trigger on right-click - right-click is for normal interactions (placing, opening containers, etc.)
-        // Only accept left-click in creative mode as a potential pick block attempt
-        // (Middle-click is the actual pick block, but it doesn't trigger server events)
-        if (e.getAction() != Action.LEFT_CLICK_BLOCK) {
-            return;
-        }
-
-        Player player = e.getPlayer();
-        
-        // Check if pick block is enabled
-        if (!enablePickBlock) {
-            return;
-        }
-
-        // Check if player has access to shulkerbox features (required for picking from shulkers)
-        if (!hasShulkerboxAccess(player)) {
-            return;
-        }
-
-        // Only handle pick block in creative mode (survival mode pick block is handled differently)
-        // In creative mode, left-click with empty hand might be a pick block attempt
-        if (player.getGameMode() != GameMode.CREATIVE) {
-            return;
-        }
-
-        // Only trigger if holding air (empty hand) - if holding an item, it's breaking/attacking, not picking
-        ItemStack heldItem = player.getInventory().getItemInMainHand();
-        boolean isHoldingAir = (heldItem == null || heldItem.getType() == Material.AIR);
-        
-        if (!isHoldingAir) {
-            return; // Holding an item = breaking/attacking, not pick block
-        }
-
-        Block clickedBlock = e.getClickedBlock();
-        if (clickedBlock == null) {
-            return;
-        }
-
-        Material blockType = clickedBlock.getType();
-        
-        // Don't pick air or invalid blocks
-        if (blockType == Material.AIR || blockType == Material.BARRIER || blockType == Material.BEDROCK) {
-            return;
-        }
-
-        // Create an ItemStack representing the block
-        ItemStack targetItem = new ItemStack(blockType, 1);
-        
-        // First check if item exists in hotbar (0-8) - if it does, vanilla pick block will work
-        boolean foundInHotbar = false;
-        int hotbarSlotFound = -1;
-        for (int i = 0; i < 9; i++) {
-            ItemStack hotbarItem = player.getInventory().getItem(i);
-            if (hotbarItem != null && hotbarItem.getType() == blockType) {
-                foundInHotbar = true;
-                hotbarSlotFound = i;
-                break;
-            }
-        }
-        
-        if (foundInHotbar) {
-            return;
-        }
-        
-        // Check if item exists elsewhere in inventory - if it does, vanilla pick block will work
-        if (itemExistsInInventory(player, targetItem, -1)) {
-            return;
-        }
-        
-        // Check if all hotbar slots are blacklisted - if so, abort immediately
-        if (areAllHotbarSlotsBlacklisted(player)) {
-            player.sendMessage(ChatColor.RED + "Cannot pick block: all hotbar slots contain items that cannot be swapped");
-            return;
-        }
-        
-        // Item not found in inventory - vanilla pick block failed, so we search shulker boxes
-        int lastHotbarSlot = playerLastHotbarSlot.getOrDefault(player.getUniqueId(), player.getInventory().getHeldItemSlot());
-        
-        // Find a free hotbar slot or use the last used one
-        int targetSlot = findFreeHotbarSlot(player);
-        if (targetSlot == -1) {
-            // No free slot, use last used slot
-            targetSlot = lastHotbarSlot;
-        }
-
-        // Get the item that will be swapped into the shulker box (from hotbar target slot)
-        ItemStack itemToSwapIntoShulker = player.getInventory().getItem(targetSlot);
-        
-        // Search for item in shulker boxes, checking all slots to find one where swap is valid
-        FindItemResult result = findItemInShulkers(player, targetItem, lastHotbarSlot, targetSlot, itemToSwapIntoShulker);
-        
-        if (result.swapData != null) {
-            // Found valid slot in shulker box
-
-            // Store swap data and perform the swap
-            playerAutoSwapData.put(player.getUniqueId(), result.swapData);
-            
-            // Get the shulker box item
-            ItemStack shulkerItem;
-            if (result.swapData.shulkerSlot == 40) {
-                shulkerItem = player.getInventory().getItemInOffHand();
-            } else {
-                shulkerItem = player.getInventory().getItem(result.swapData.shulkerSlot);
-            }
-            
-            if (shulkerItem != null && IsShulkerBox(shulkerItem.getType())) {
-                // Perform swap directly without opening shulker
-                performPickBlockSwap(player, result.swapData, shulkerItem);
-                
-                // Play sound
-                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 0.5f, 1.2f);
-                // player.sendMessage(ChatColor.GREEN + "Picked " + blockType.name().toLowerCase().replace("_", " ") + " from shulker box");
-            }
-        } else {
-            // Item not found in shulker boxes, or all slots would result in blacklisted swap
-            // Don't send messages for event-based detection (only for command-based)
-            // The client mod handles messaging, and event-based detection is just a fallback
-            // Messages removed to avoid spam when right-clicking blocks normally
-        }
+        // This handler is disabled - shulker pick block only works via command or PlayerPickBlockEvent
+        // Left here as documentation for backwards compatibility but returns immediately
+        // Creative/spectator/adventure players should use default Minecraft behavior
+        return;
     }
 
     /**
@@ -895,14 +778,34 @@ public class InventoryListener implements Listener
         // Item not in inventory, search shulker boxes
         int lastHotbarSlot = playerLastHotbarSlot.getOrDefault(player.getUniqueId(), player.getInventory().getHeldItemSlot());
         
-        // Find a free hotbar slot or use the last used one
-        int targetSlot = findFreeHotbarSlot(player);
+        // Find the best hotbar slot using priority:
+        // 1. Empty hotbar slot
+        // 2. Active hotbar slot (if not blacklisted)
+        // 3. Next non-blacklisted slot to the right (wrapping)
+        int targetSlot = findBestHotbarSlotForPick(player);
         if (targetSlot == -1) {
-            targetSlot = lastHotbarSlot;
+            player.sendMessage(ChatColor.RED + "Cannot pick block: all hotbar slots contain items that cannot be swapped");
+            return false;
         }
 
-        // Get the item that will be swapped into the shulker box (from hotbar target slot)
-        ItemStack itemToSwapIntoShulker = player.getInventory().getItem(targetSlot);
+        // Get the item that will be displaced from the target slot
+        ItemStack itemToDisplace = player.getInventory().getItem(targetSlot);
+        
+        // Determine what happens to the displaced item:
+        // 1. If slot is empty, nothing to do
+        // 2. Try to move displaced item to spare inventory slot (not hotbar)
+        // 3. Only swap into shulker if no empty inventory slots
+        ItemStack itemToSwapIntoShulker = null;
+        int emptyInventorySlot = -1;
+        
+        if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR) {
+            // Try to find an empty inventory slot to move the displaced item
+            emptyInventorySlot = findEmptyInventorySlot(player);
+            if (emptyInventorySlot == -1) {
+                // No empty inventory slot, item will go into shulker
+                itemToSwapIntoShulker = itemToDisplace;
+            }
+        }
         
         // Search for item in shulker boxes, checking all slots to find one where swap is valid
         FindItemResult result = findItemInShulkers(player, targetItem, lastHotbarSlot, targetSlot, itemToSwapIntoShulker);
@@ -919,6 +822,12 @@ public class InventoryListener implements Listener
             }
             
             if (shulkerItem != null && IsShulkerBox(shulkerItem.getType())) {
+                // Move displaced item to empty inventory slot if available
+                if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR && emptyInventorySlot != -1) {
+                    player.getInventory().setItem(emptyInventorySlot, itemToDisplace.clone());
+                    player.getInventory().setItem(targetSlot, null); // Clear the slot before swap
+                }
+                
                 // Perform swap directly without opening shulker
                 performPickBlockSwap(player, result.swapData, shulkerItem);
                 
@@ -954,6 +863,44 @@ public class InventoryListener implements Listener
         return -1;
     }
 
+    /**
+     * Find the best hotbar slot for placing a picked item using priority:
+     * 1. First: any empty hotbar slot
+     * 2. Second: active hotbar slot (if not blacklisted)
+     * 3. Third: next non-blacklisted slot to the right of active (wrapping from slot 8 to slot 0)
+     * 
+     * @param player The player
+     * @return The best hotbar slot index (0-8), or -1 if none available
+     */
+    private int findBestHotbarSlotForPick(Player player) {
+        int activeSlot = player.getInventory().getHeldItemSlot();
+        
+        // Priority 1: Empty hotbar slot
+        int emptySlot = findFreeHotbarSlot(player);
+        if (emptySlot != -1) {
+            return emptySlot;
+        }
+        
+        // Priority 2: Active hotbar slot (if not blacklisted)
+        ItemStack activeItem = player.getInventory().getItem(activeSlot);
+        if (activeItem == null || activeItem.getType() == Material.AIR || !isBlacklistedForShulkerSwap(activeItem.getType())) {
+            return activeSlot;
+        }
+        
+        // Priority 3: Search to the right from active slot, wrapping around
+        // Start from activeSlot + 1 and wrap around to find a non-blacklisted slot
+        for (int offset = 1; offset < 9; offset++) {
+            int slot = (activeSlot + offset) % 9;
+            ItemStack item = player.getInventory().getItem(slot);
+            if (item == null || item.getType() == Material.AIR || !isBlacklistedForShulkerSwap(item.getType())) {
+                return slot;
+            }
+        }
+        
+        // All slots are blacklisted
+        return -1;
+    }
+
     // Helper method to find a usable hotbar slot (empty or non-blacklisted) excluding a specific slot
     private int findFreeHotbarSlotExcluding(Player player, int excludeSlot) {
         for (int i = 0; i < 9; i++) {
@@ -983,6 +930,22 @@ public class InventoryListener implements Listener
         for (int i = 0; i < 9; i++) {
             ItemStack item = player.getInventory().getItem(i);
             if (item != null && !isBlacklistedForShulkerSwap(item.getType())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+    
+    /**
+     * Find an empty slot in the main inventory (slots 9-35, excluding hotbar).
+     * @param player The player
+     * @return The empty inventory slot index, or -1 if none available
+     */
+    private int findEmptyInventorySlot(Player player) {
+        // Main inventory slots are 9-35 (hotbar is 0-8)
+        for (int i = 9; i < 36; i++) {
+            ItemStack item = player.getInventory().getItem(i);
+            if (item == null || item.getType() == Material.AIR) {
                 return i;
             }
         }

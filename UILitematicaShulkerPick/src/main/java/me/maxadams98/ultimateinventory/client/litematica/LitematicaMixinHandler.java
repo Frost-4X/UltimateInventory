@@ -3,6 +3,7 @@ package me.maxadams98.ultimateinventory.client.litematica;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.world.GameMode;
 import me.maxadams98.ultimateinventory.client.util.PickBlockUtils;
 import me.maxadams98.ultimateinventory.client.PrinterIntegration;
 
@@ -18,6 +19,12 @@ public class LitematicaMixinHandler {
         }
         
         ClientPlayerEntity player = client.player;
+
+        // Only handle pick block for survival mode players
+        // Creative/spectator/adventure should use default behavior
+        if (client.interactionManager == null || client.interactionManager.getCurrentGameMode() != GameMode.SURVIVAL) {
+            return;
+        }
 
         // Check if the item is available in accessible slots
         boolean itemAvailable = PickBlockUtils.itemExistsInNonBlacklistedHotbarSlot(player, targetItem);
