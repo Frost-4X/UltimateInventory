@@ -40,6 +40,7 @@ public class InventoryListener implements Listener
     Map<UUID, String> playerLastOpenedMenu = new HashMap<>();
     Map<UUID, Integer> playerLastHotbarSlot = new HashMap<>(); // Map to store last hotbar slot
     Map<UUID, AutoSwapData> playerAutoSwapData = new HashMap<>(); // Map to store auto-swap data
+    Map<UUID, Long> playerLastPickBlockAttempt = new HashMap<>(); // Map to track last pick block attempt time
 
     boolean enableShulkerbox;
     boolean overrideShulkerbox;
@@ -601,6 +602,7 @@ public class InventoryListener implements Listener
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerPickBlock(PlayerPickBlockEvent e) {
         Player player = e.getPlayer();
+        UUID playerId = player.getUniqueId();
         
         // Check if pick block is enabled
         if (!enablePickBlock) {
@@ -624,19 +626,41 @@ public class InventoryListener implements Listener
             return; // Item is already in inventory, let vanilla handle it
         }
         
+        // Debounce: Prevent multiple pick block attempts from running simultaneously
+        // If a pick block was attempted within the last 100ms, ignore this one
+        long currentTime = System.currentTimeMillis();
+        Long lastAttemptTime = playerLastPickBlockAttempt.get(playerId);
+        if (lastAttemptTime != null && (currentTime - lastAttemptTime) < 100) {
+            // Too soon after last attempt - let this one be handled by default behavior
+            return;
+        }
+        // Note: We update the timestamp AFTER we successfully handle the request below
+        
+        // Get the block the player is targeting
+        Block targetBlock = player.getTargetBlock(null, 5); // 5 block reach
+        if (targetBlock == null || targetBlock.getType() == Material.AIR) {
+            return; // Can't determine what to pick
+        }
+        
+        Material blockType = targetBlock.getType();
+        
+        // Don't pick air or invalid blocks
+        if (blockType == Material.AIR || blockType == Material.BARRIER || blockType == Material.BEDROCK) {
+            return;
+        }
+        
+        // Create an ItemStack representing the block
+        ItemStack targetItem = new ItemStack(blockType, 1);
+        
         // Find the best hotbar slot using priority:
         // 1. Empty hotbar slot
         // 2. Active hotbar slot (if not blacklisted)
         // 3. Next non-blacklisted slot to the right (wrapping)
         int targetSlot = findBestHotbarSlotForPick(player);
         if (targetSlot == -1) {
-            e.setCancelled(true);
-            player.sendMessage(ChatColor.RED + "Cannot pick block: all hotbar slots contain items that cannot be swapped");
+            // Don't cancel the event - let Minecraft try its default behavior
             return;
         }
-        
-        // Update the event's target slot to our calculated best slot
-        e.setTargetSlot(targetSlot);
         
         // Get the item that will be displaced from the target slot
         ItemStack itemToDisplace = player.getInventory().getItem(targetSlot);
@@ -664,22 +688,6 @@ public class InventoryListener implements Listener
             }
         }
         
-        // Get the block the player is targeting
-        Block targetBlock = player.getTargetBlock(null, 5); // 5 block reach
-        if (targetBlock == null || targetBlock.getType() == Material.AIR) {
-            return; // Can't determine what to pick
-        }
-        
-        Material blockType = targetBlock.getType();
-        
-        // Don't pick air or invalid blocks
-        if (blockType == Material.AIR || blockType == Material.BARRIER || blockType == Material.BEDROCK) {
-            return;
-        }
-        
-        // Create an ItemStack representing the block
-        ItemStack targetItem = new ItemStack(blockType, 1);
-        
         // Search for item in shulker boxes
         int lastHotbarSlot = playerLastHotbarSlot.getOrDefault(player.getUniqueId(), player.getInventory().getHeldItemSlot());
         FindItemResult result = findItemInShulkers(player, targetItem, lastHotbarSlot, targetSlot, itemToSwapIntoShulker);
@@ -694,8 +702,14 @@ public class InventoryListener implements Listener
             }
             
             if (shulkerItem != null && IsShulkerBox(shulkerItem.getType())) {
+                // Update the debounce timestamp since we're successfully handling this request
+                playerLastPickBlockAttempt.put(playerId, currentTime);
+                
                 // Cancel the event since we're handling it ourselves
                 e.setCancelled(true);
+                
+                // Update the event's target slot to our calculated best slot
+                e.setTargetSlot(targetSlot);
                 
                 // Move displaced item to destination inventory slot if available
                 if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR && destinationInventorySlot != -1) {
