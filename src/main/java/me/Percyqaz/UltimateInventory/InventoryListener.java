@@ -642,17 +642,24 @@ public class InventoryListener implements Listener
         ItemStack itemToDisplace = player.getInventory().getItem(targetSlot);
         
         // Determine what happens to the displaced item:
-        // 1. If slot is empty, nothing to do
-        // 2. Try to move displaced item to spare inventory slot (not hotbar)
-        // 3. Only swap into shulker if no empty inventory slots
+        // Priority 1: If slot is empty, nothing to do
+        // Priority 2: Try to stack with same item type in inventory (not hotbar)
+        // Priority 3: Try to move displaced item to empty inventory slot (not hotbar)
+        // Priority 4: Swap into shulker if no other options
         ItemStack itemToSwapIntoShulker = null;
-        int emptyInventorySlot = -1;
+        int destinationInventorySlot = -1;
         
         if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR) {
-            // Try to find an empty inventory slot to move the displaced item
-            emptyInventorySlot = findEmptyInventorySlot(player);
-            if (emptyInventorySlot == -1) {
-                // No empty inventory slot, item will go into shulker
+            // Priority 2: Try to find a slot with the same item type with room to stack
+            destinationInventorySlot = findSlotWithSameItem(player, itemToDisplace);
+            
+            if (destinationInventorySlot == -1) {
+                // Priority 3: Try to find an empty inventory slot
+                destinationInventorySlot = findEmptyInventorySlot(player);
+            }
+            
+            if (destinationInventorySlot == -1) {
+                // Priority 4: No matching stack or empty slot, item will go into shulker
                 itemToSwapIntoShulker = itemToDisplace;
             }
         }
@@ -690,9 +697,29 @@ public class InventoryListener implements Listener
                 // Cancel the event since we're handling it ourselves
                 e.setCancelled(true);
                 
-                // Move displaced item to empty inventory slot if available
-                if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR && emptyInventorySlot != -1) {
-                    player.getInventory().setItem(emptyInventorySlot, itemToDisplace.clone());
+                // Move displaced item to destination inventory slot if available
+                if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR && destinationInventorySlot != -1) {
+                    // Check if destination has the same item (for stacking)
+                    ItemStack destinationItem = player.getInventory().getItem(destinationInventorySlot);
+                    if (destinationItem != null && destinationItem.getType() == itemToDisplace.getType() && destinationItem.isSimilar(itemToDisplace)) {
+                        // Stack items together
+                        int newAmount = destinationItem.getAmount() + itemToDisplace.getAmount();
+                        int maxStackSize = destinationItem.getType().getMaxStackSize();
+                        if (newAmount <= maxStackSize) {
+                            destinationItem.setAmount(newAmount);
+                            player.getInventory().setItem(destinationInventorySlot, destinationItem);
+                        } else {
+                            // Partial stack - fill destination to max, keep remainder
+                            destinationItem.setAmount(maxStackSize);
+                            player.getInventory().setItem(destinationInventorySlot, destinationItem);
+                            itemToDisplace.setAmount(newAmount - maxStackSize);
+                            player.getInventory().setItem(targetSlot, itemToDisplace);
+                            return; // Don't clear the target slot
+                        }
+                    } else {
+                        // Move to empty slot
+                        player.getInventory().setItem(destinationInventorySlot, itemToDisplace.clone());
+                    }
                     player.getInventory().setItem(targetSlot, null); // Clear the slot before swap
                 }
                 
@@ -792,17 +819,24 @@ public class InventoryListener implements Listener
         ItemStack itemToDisplace = player.getInventory().getItem(targetSlot);
         
         // Determine what happens to the displaced item:
-        // 1. If slot is empty, nothing to do
-        // 2. Try to move displaced item to spare inventory slot (not hotbar)
-        // 3. Only swap into shulker if no empty inventory slots
+        // Priority 1: If slot is empty, nothing to do
+        // Priority 2: Try to stack with same item type in inventory (not hotbar)
+        // Priority 3: Try to move displaced item to empty inventory slot (not hotbar)
+        // Priority 4: Swap into shulker if no other options
         ItemStack itemToSwapIntoShulker = null;
-        int emptyInventorySlot = -1;
+        int destinationInventorySlot = -1;
         
         if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR) {
-            // Try to find an empty inventory slot to move the displaced item
-            emptyInventorySlot = findEmptyInventorySlot(player);
-            if (emptyInventorySlot == -1) {
-                // No empty inventory slot, item will go into shulker
+            // Priority 2: Try to find a slot with the same item type with room to stack
+            destinationInventorySlot = findSlotWithSameItem(player, itemToDisplace);
+            
+            if (destinationInventorySlot == -1) {
+                // Priority 3: Try to find an empty inventory slot
+                destinationInventorySlot = findEmptyInventorySlot(player);
+            }
+            
+            if (destinationInventorySlot == -1) {
+                // Priority 4: No matching stack or empty slot, item will go into shulker
                 itemToSwapIntoShulker = itemToDisplace;
             }
         }
@@ -822,10 +856,38 @@ public class InventoryListener implements Listener
             }
             
             if (shulkerItem != null && IsShulkerBox(shulkerItem.getType())) {
-                // Move displaced item to empty inventory slot if available
-                if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR && emptyInventorySlot != -1) {
-                    player.getInventory().setItem(emptyInventorySlot, itemToDisplace.clone());
-                    player.getInventory().setItem(targetSlot, null); // Clear the slot before swap
+                // Move displaced item to destination inventory slot if available
+                if (itemToDisplace != null && itemToDisplace.getType() != Material.AIR && destinationInventorySlot != -1) {
+                    // Check if destination has the same item (for stacking)
+                    ItemStack destinationItem = player.getInventory().getItem(destinationInventorySlot);
+                    if (destinationItem != null && destinationItem.getType() == itemToDisplace.getType() && destinationItem.isSimilar(itemToDisplace)) {
+                        // Stack items together
+                        int newAmount = destinationItem.getAmount() + itemToDisplace.getAmount();
+                        int maxStackSize = destinationItem.getType().getMaxStackSize();
+                        if (newAmount <= maxStackSize) {
+                            destinationItem.setAmount(newAmount);
+                            player.getInventory().setItem(destinationInventorySlot, destinationItem);
+                            player.getInventory().setItem(targetSlot, null); // Clear the slot before swap
+                        } else {
+                            // Partial stack - fill destination to max, keep remainder in target slot
+                            destinationItem.setAmount(maxStackSize);
+                            player.getInventory().setItem(destinationInventorySlot, destinationItem);
+                            itemToDisplace.setAmount(newAmount - maxStackSize);
+                            // Keep remainder in target slot, will be swapped to shulker
+                            itemToSwapIntoShulker = itemToDisplace;
+                            // Recalculate since we have leftover items
+                            FindItemResult recalcResult = findItemInShulkers(player, targetItem, lastHotbarSlot, targetSlot, itemToSwapIntoShulker);
+                            if (recalcResult.swapData == null) {
+                                player.sendMessage(ChatColor.RED + "Cannot complete swap: partial stack overflow");
+                                return false;
+                            }
+                            result = recalcResult;
+                        }
+                    } else {
+                        // Move to empty slot
+                        player.getInventory().setItem(destinationInventorySlot, itemToDisplace.clone());
+                        player.getInventory().setItem(targetSlot, null); // Clear the slot before swap
+                    }
                 }
                 
                 // Perform swap directly without opening shulker
@@ -949,6 +1011,35 @@ public class InventoryListener implements Listener
                 return i;
             }
         }
+        return -1;
+    }
+
+    /**
+     * Find a slot in the player's inventory (excluding hotbar) that contains the same item type
+     * with room to stack more of that item.
+     * @param player The player
+     * @param itemToPlace The item to find a matching stack for
+     * @return The inventory slot index with room for more of this item, or -1 if none available
+     */
+    private int findSlotWithSameItem(Player player, ItemStack itemToPlace) {
+        if (itemToPlace == null || itemToPlace.getType() == Material.AIR) {
+            return -1;
+        }
+
+        Material targetType = itemToPlace.getType();
+        int maxStackSize = targetType.getMaxStackSize();
+
+        // Search main inventory slots 9-35 (excluding hotbar 0-8)
+        for (int i = 9; i < 36; i++) {
+            ItemStack item = player.getInventory().getItem(i);
+            if (item != null && item.getType() == targetType) {
+                // Check if items are similar (same type, enchants, etc) and have room to stack
+                if (item.isSimilar(itemToPlace) && item.getAmount() < maxStackSize) {
+                    return i;
+                }
+            }
+        }
+        
         return -1;
     }
 
