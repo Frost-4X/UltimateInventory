@@ -2,3 +2,7 @@
 target
 /UltimateInventory.iml
 /libs/*.jar
+.gradle
+.vscode
+build
+.env
